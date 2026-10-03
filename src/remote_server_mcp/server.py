@@ -8,8 +8,8 @@ import tempfile
 import random
 import json
 import asyncio
-TEMP_DIR = tempfile.gettempdir()
-DB_PATH = os.path.join(TEMP_DIR,"expenses.db")
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(SCRIPT_DIR, "expenses.db")
 
 CATEGORIES_PATH = os.path.join(os.path.dirname(__file__),"categories.json")
 mcp = FastMCP("ExpenseTracker")
@@ -53,14 +53,14 @@ class ExpenseCreate(BaseModel):
     note:str = Field(default=" ")
 
 @mcp.tool()
-async def add_expenses(date,amount,category,subcategory=" ",note=" "):
+async def add_expenses(expense:ExpenseCreate):
     """ ADD a new expense entry to the database. """
     try:
          await ensure_db()
          async with aiosqlite.connect(DB_PATH) as c:
                  cur = await c.execute(
                  "INSERT INTO expenses(date,amount,category,subcategory,note) VALUES(?,?,?,?,?)",
-                 (date,amount,category,subcategory,note)
+                 (expense.date,expense.amount,expense.category,expense.subcategory,expense.note)
 
              )
                  expense_id = cur.lastrowid
@@ -118,33 +118,6 @@ async def summarize(start_date,end_date,category=None):
     except Exception as e:
         return {"status":"error","message":f"Error summarizing expensese{e}"}
        
-@mcp.tool
-def add(a:int,b:int)->float:
-    """
-    Add two numbers together.
-
-    Args:
-    a: First number
-    b: Second number
-    Returns:
-       The Sum of a and b
-    """
-    return a + b
-
-@mcp.tool
-def random_no(min_val:int = 1,max_val:int = 100) ->int:
-    """Generate a random number within a range.
-    
-    Args:
-    min_val: Minimum value (default 1)
-    max_value: Maximum value (default 100)
-
-    Return:
-       A random integer between min_val and max_val
-
-    """    
-    return random.randint(min_val,max_val)
-
 @mcp.resource("info://server")
 def server_into()->str:
     """Get information about this server."""
