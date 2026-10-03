@@ -13,6 +13,9 @@ DB_PATH = os.path.join(TEMP_DIR,"expenses.db")
 
 CATEGORIES_PATH = os.path.join(os.path.dirname(__file__),"categories.json")
 mcp = FastMCP("ExpenseTracker")
+_db_ready = False
+
+
 async def init_db():
     try:
          async with aiosqlite.connect(DB_PATH) as c:
@@ -29,7 +32,17 @@ async def init_db():
              await c.commit() 
     except Exception as e:
         raise RuntimeError(f"Database initialization error:{e}") from e
-asyncio.run(init_db())
+
+
+async def ensure_db():
+    """Lazily initialize the DB on first use, inside an existing event loop.
+    Avoids calling asyncio.run() at import time, which breaks if the
+    hosting platform already has a loop running when it imports this module.
+    """
+    global _db_ready
+    if not _db_ready:
+        await init_db()
+        _db_ready = True
 
 
 class ExpenseCreate(BaseModel):
@@ -43,6 +56,7 @@ class ExpenseCreate(BaseModel):
 async def add_expenses(date,amount,category,subcategory=" ",note=" "):
     """ ADD a new expense entry to the database. """
     try:
+         await ensure_db()
          async with aiosqlite.connect(DB_PATH) as c:
                  cur = await c.execute(
                  "INSERT INTO expenses(date,amount,category,subcategory,note) VALUES(?,?,?,?,?)",
@@ -60,6 +74,7 @@ async def add_expenses(date,amount,category,subcategory=" ",note=" "):
 async def list_expenses(start_date,end_date):
     """ RETRIEVE THE EXPENSE DATA  FROM DATABASE """
     try:
+         await ensure_db()
          async with aiosqlite.connect(DB_PATH) as c:
 
              cur = await c.execute(
@@ -80,6 +95,7 @@ async def list_expenses(start_date,end_date):
 async def summarize(start_date,end_date,category=None):
     """ Summarize expenses by category within an inclusive date range. """
     try:
+         await ensure_db()
          async with aiosqlite.connect(DB_PATH) as c:
 
              query = (
